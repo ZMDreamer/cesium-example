@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="stylesheet"
+      href="http://192.168.1.111:8000/static/lib/widgets.css"
+    />
+    <script
+      type="text/javascript"
+      src="http://192.168.1.111:8000/static/lib/Cesium@1.124/Cesium.js"
+    ></script>
+    <script
+      type="text/javascript"
+      src="http://192.168.1.111:8000/static/lib/proj4.js"
+    ></script>
+    <script
+      type="text/javascript"
+      src="http://192.168.1.111:8000/static/lib/ol.js"
+    ></script>
+    <script src="http://192.168.1.111:8000/static/lib/defineCRS.js"></script>
+    <title>Cesium</title>
+    <style type="text/css">
+      html,
+      body,
+      #cesiumContainer {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+  </body>
+  <script>
+    var url = new URL(
+      "http://110xdmo484543.vicp.fun:18236/abpd-develop/hgis/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&FORMAT=image/png&TILECOL=0&TILEROW=0&TILEMATRIXSET=TDT_2&MATRIXSET=TDT_2&TILEMATRIX=TDT_2:0&LAYERS=ktw:xytext_2018_level_17AXZ&accessToken=YCjPOQLbiEOcRzMLy5SVT9z858PgB0rSgpJYcQkvDMwwA%2FRfot%2FM2%2Fk9iRJB6ljJ"
+    );
+    var accessToken = url.searchParams.get("accessToken") || "";
+    var layerName =
+      url.searchParams.get("LAYERS") ||
+      url.searchParams.get("layers") ||
+      url.searchParams.get("LAYER") ||
+      url.searchParams.get("layer");
+    var requestUrl = url.origin + url.pathname;
+    var defCRS = url.searchParams.get("SRS") || "EPSG:100006" || "EPSG:4490";
+    var matrixSet = url.searchParams.get("MATRIXSET") || "";
+    var layerName =
+      url.searchParams.get("LAYERS") ||
+      url.searchParams.get("layers") ||
+      url.searchParams.get("LAYER") ||
+      url.searchParams.get("layer");
+    var requestUrl = new URL(url.origin + url.pathname);
+    requestUrl.searchParams.append("request", "GetCapabilities");
+    requestUrl.searchParams.append("service", "wmts");
+    requestUrl.searchParams.append("layer", layerName);
+    requestUrl.searchParams.append("accessToken", accessToken);
+
+    fetch(requestUrl)
+      .then((res) => res.text())
+      .then((xml) => {
+        let bbox = [
+          111.4412784576416, 27.18815803527832, 111.4877986907959,
+          27.216482162475586,
+        ];
+        var result = new ol.format.WMTSCapabilities().read(xml);
+        let matrixIds = [];
+        const matrixSetInfo = result.Contents.TileMatrixSet;
+
+        if (matrixSetInfo) {
+          // 找到 TDT_2 矩阵集
+          const targetMatrixSet = Array.isArray(matrixSetInfo)
+            ? matrixSetInfo.find((set) => set.Identifier === matrixSet)
+            : matrixSetInfo;
+
+          if (targetMatrixSet && targetMatrixSet.TileMatrix) {
+            matrixIds = targetMatrixSet.TileMatrix.map(
+              (matrix) => matrix.Identifier
+            );
+            console.log("提取的 TDT_2 矩阵ID:", matrixIds);
+          }
+        }
+
+        // 创建 Cesium Viewer 实例，禁用所有控件
+        const viewer = new Cesium.Viewer("cesiumContainer", {
+          imageryProvider: false, // 禁用默认影像提供商（Cesium ion）
+          terrainProvider: new Cesium.EllipsoidTerrainProvider(), // 关闭 Cesium ion 3D 地形
+          baseLayerPicker: false, // 关闭默认的图层选择器
+          shouldAnimate: true, // 启用动画
+          timeline: false, // 禁用时间轴
+          animation: false, // 禁用动画控制
+          navigationHelpButton: false, // 禁用导航帮助按钮
+          sceneModePicker: false, // 禁用场景模式选择器（2D/3D/Columbus）
+          homeButton: false, // 禁用主页按钮
+          fullscreenButton: false, // 禁用全屏按钮
+          infoBox: false, // 禁用信息框
+          selectionIndicator: false, // 禁用选择指示器
+          geocoder: false, // 禁用地理编码器
+          baseLayerPicker: false, // 禁用底图选择器
+          requestRenderMode: true, // 禁用自动渲染
+          scene3DOnly: true, // 只显示3D场景
+          imageryProviderViewModels:
+            Cesium.createDefaultImageryProviderViewModels(),
+          selectedImageryProviderViewModel:
+            Cesium.createDefaultImageryProviderViewModels()[0],
+        });
+        //加载数据
+        // viewer.imageryLayers.addImageryProvider(
+        //   new Cesium.WebMapTileServiceImageryProvider({
+        //     url:
+        //       'http://110xdmo484543.vicp.fun:18236/abpd-develop/hgis/wmts' +
+        //       "?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0" +
+        //       "&LAYER=" +
+        //       layerName +
+        //       "&STYLE=&FORMAT=image/png" +
+        //       "&TILEMATRIXSET=" +
+        //       matrixSet +
+        //       "&TILEMATRIX={TileMatrix}" +
+        //       "&TILEROW={TileRow}&TILECOL={TileCol}" +
+        //       "&accessToken=" +
+        //       accessToken,
+        //     layer: layerName,
+        //     style: "",
+        //     format: "image/png",
+        //     tileMatrixSetID: matrixSet,
+        //     tileMatrixLabels: [
+        //       "TDT_2:0",
+        //       "TDT_2:1",
+        //       "TDT_2:2",
+        //       "TDT_2:3",
+        //       "TDT_2:4",
+        //       "TDT_2:5",
+        //       "TDT_2:6",
+        //       "TDT_2:7",
+        //       "TDT_2:8",
+        //       "TDT_2:9",
+        //       "TDT_2:10",
+        //       "TDT_2:11",
+        //       "TDT_2:12",
+        //       "TDT_2:13",
+        //       "TDT_2:14",
+        //       "TDT_2:15",
+        //       "TDT_2:16",
+        //       "TDT_2:17",
+        //       "TDT_2:18",
+        //       "TDT_2:19",
+        //       "TDT_2:20",
+        //     ],
+        //     tilingScheme: new Cesium.GeographicTilingScheme({
+        //       numberOfLevelZeroTilesX: 2,
+        //       numberOfLevelZeroTilesY: 1,
+        //       rectangle: Cesium.Rectangle.fromDegrees(-180, -90, 180, 90),
+        //     }),
+        //     tileWidth: 256,
+        //     tileHeight: 256,
+        //     minimumLevel: 0,
+        //     maximumLevel: 20,
+        //     show: false,
+        //   })
+        // );
+        viewer.imageryLayers.addImageryProvider(
+          new Cesium.WebMapTileServiceImageryProvider({
+            url:
+              "http://110xdmo484543.vicp.fun:18236/abpd-develop/hgis/wmts" +
+              "?accessToken=" +
+              accessToken,
+            layer: layerName,
+            style: "",
+            format: "image/png",
+            tileMatrixSetID: matrixSet,
+            tileMatrixLabels: matrixIds.slice(1,),
+            // tileMatrixLabels: [
+            //   "TDT_2:1",
+            //   "TDT_2:2",
+            //   "TDT_2:3",
+            //   "TDT_2:4",
+            //   "TDT_2:5",
+            //   "TDT_2:6",
+            //   "TDT_2:7",
+            //   "TDT_2:8",
+            //   "TDT_2:9",
+            //   "TDT_2:10",
+            //   "TDT_2:11",
+            //   "TDT_2:12",
+            //   "TDT_2:13",
+            //   "TDT_2:14",
+            //   "TDT_2:15",
+            //   "TDT_2:16",
+            //   "TDT_2:17",
+            //   "TDT_2:18",
+            //   "TDT_2:19",
+            //   "TDT_2:20",
+            // ],
+            tilingScheme: new Cesium.GeographicTilingScheme({
+              numberOfLevelZeroTilesX: 2, // 第0级在X方向有2个瓦片
+              numberOfLevelZeroTilesY: 1, // 第0级在Y方向有1个瓦片
+            }),
+            show: false,
+          })
+        );
+        const rectangle = Cesium.Rectangle.fromDegrees(...bbox);
+
+        // 定位到这个区域
+        viewer.camera.flyTo({
+          destination: rectangle,
+          duration: 2.0, // 设置动画过渡的时间，单位秒
+        });
+      });
+  </script>
+</html>
